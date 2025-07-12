@@ -117,19 +117,19 @@ void parse_and_execute(t_shell *shell, char *input) {
 
     expand_variables(tokens, shell->env, shell->last_status);
     t_cmd *cmd = parse_tokens(tokens);
-    t_cmd *tmp = cmd;
-    while (tmp) {
-        int i = 0, j = 0;
-        while (tmp->argv[i]){
-            printf("%s ", tmp->argv[i]);
-            i++;
-        }
-        printf("\n");
-        tmp = tmp->next;
-    }
+    // t_cmd *tmp = cmd;
+    // while (tmp) {
+    //     int i = 0, j = 0;
+    //     while (tmp->argv[i]){
+    //         printf("%s ", tmp->argv[i]);
+    //         i++;
+    //     }
+    //     printf("\n");
+    //     tmp = tmp->next;
+    // }
     free_tokens(tokens);
     if (!cmd) return;
 
-    // execute_cmd(shell, cmd);
+    execute_cmd(shell, cmd);
     free_cmd(cmd);
 }

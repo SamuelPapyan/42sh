@@ -6,7 +6,7 @@
 int main() {
     char *commands[][4] = {
         {"echo", "Hello World!", NULL},
-        {"wc", "-c", NULL}
+        {"tr", "a-z", "A-Z", NULL}
     };
     int num_cmds = 2;
 
