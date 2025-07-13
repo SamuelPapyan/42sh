@@ -26,101 +26,82 @@ static void	apply_redirs(t_redir *r)
 	}
 }
 
-static int count_of_pipe_cmds(t_cmd* cmd) {
-	t_cmd	*tmp = cmd;
-	int		c = 0;
+// static int count_of_pipe_cmds(t_cmd* cmd) {
+// 	t_cmd	*tmp = cmd;
+// 	int		c = 0;
 
-	while (tmp) {
-		c++;
-		cmd = cmd->pipe_next;
-	}
-	return c;
-}
+// 	while (tmp) {
+// 		c++;
+// 		cmd = cmd->pipe_next;
+// 	}
+// 	return c;
+// }
 
 // Выполнение пайпов: a | b | c
 void	run_pipeline(t_cmd *cmd, t_shell *shell)
 {
-	int		num_cmds = count_of_pipe_cmds(cmd);
-	int		pipes[num_cmds - 1][2];
-	pid_t	pids[num_cmds];
-	// int		pid_count = 0;
+	int		prev_fd = -1;
+	int		fd[2];
+	pid_t	pids[256];
+	int		pid_count = 0;
 
-	for (int i = 0; i < num_cmds - 1; i++) {
-		if (pipe(pipes[i]) == - 1) {
+	while (cmd)
+	{
+		if (cmd->pipe_next && pipe(fd) == -1)
+		{
 			perror("pipe");
 			return;
 		}
-	}
 
-	int i = 0;
-	while (cmd)
-	{
-		pids[i] = fork();
-		if (pids[i] == -1)
+		pid_t pid = fork();
+		if (pid == -1)
 		{
 			perror("fork");
 			return;
 		}
-		
-		if (pids[i] == 0)
+		else if (pid == 0)
 		{
-			if (i != 0)
+			if (prev_fd != -1)
 			{
-				dup2(pipes[i - 1][0], STDIN_FILENO);
-				// close(prev_fd);
+				dup2(prev_fd, STDIN_FILENO);
+				close(prev_fd);
 			}
 			if (cmd->pipe_next)
 			{
-				// close(fd[0]); // не читаем
-				dup2(pipes[i][1], STDOUT_FILENO);
-				// close(fd[1]);
+				close(fd[0]); // не читаем
+				dup2(fd[1], STDOUT_FILENO);
+				close(fd[1]);
 			}
 			apply_redirs(cmd->redirs);
-			for (int j = 0; j < num_cmds - 1; j++) {
-				close(pipes[j][0]);
-				close(pipes[j][1]);
-			}
-			// if (is_builtin(cmd->argv[0]))
-			// 	exit(exec_builtin(shell, cmd->argv));
+
+			if (is_builtin(cmd->argv[0]))
+				exit(exec_builtin(shell, cmd->argv));
 
 			// char **envp = env_to_envp(shell->env);
 			execvp(cmd->argv[0], cmd->argv);
 			perror("exec");
 			exit(1);
 		}
-		
-		
-		// if (prev_fd != -1)
-		// 	close(prev_fd);
-		// if (cmd->pipe_next)
-		// {
-			// 	close(fd[1]); // не пишем
-			// 	prev_fd = fd[0];
-			// }
+		else
+		{
+			pids[pid_count++] = pid;
+			if (prev_fd != -1)
+				close(prev_fd);
+			if (cmd->pipe_next)
+			{
+				close(fd[1]); // не пишем
+				prev_fd = fd[0];
+			}
+		}
 		cmd = cmd->pipe_next;
-		i++;
-	}
-	
-	for (i = 0; i < num_cmds - 1; i++) {
-		close(pipes[i][0]);
-		close(pipes[i][1]);
 	}
 
-	int status;
-	for (i = 0; i < num_cmds; i++)
+	for (int i = 0; i < pid_count; i++)
 	{
-		pid_t wpid = waitpid(pids[i], &status, 0);
-		if (wpid == -1) {
-			perror("waitpid");
-			shell->last_status = 1;
-			return;
-		}
-		if (WIFEXITED(status)) {
-			if (i == num_cmds - 1)
-				shell->last_status = WEXITSTATUS(status);
-		} else {
-			shell->last_status = 1;
-		}
+		int status;
+		waitpid(pids[i], &status, 0);
+		if (i == pid_count - 1)
+			shell->last_status = WEXITSTATUS(status);
 	}
 }
 

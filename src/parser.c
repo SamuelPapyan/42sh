@@ -125,7 +125,7 @@ t_cmd	*parse_tokens(char **tokens)
 }
 
 void free_cmd(t_cmd *cmd) {
-    printf("FRREING COMMANDS\n");
+    // printf("FRREING COMMANDS\n");
     while (cmd) {
         t_cmd *next = cmd->next;
         for (int i = 0; cmd->argv && cmd->argv[i]; i++)
@@ -139,49 +139,12 @@ void free_cmd(t_cmd *cmd) {
             free(r);
             r = n;
         }
-        // if (cmd->pipe_next)
-            // free_cmd(cmd->pipe_next);
+        if (cmd->pipe_next)
+            free_cmd(cmd->pipe_next);
         free(cmd);
         cmd = next;
     }
 }
-
-// static void print_pipe_args(t_cmd *cmd) {
-//     t_cmd *tmp = cmd;
-//     while (tmp) {
-//         for (int i = 0; tmp->argv[i]; i++) {
-//             printf("%s ", tmp->argv[i]);
-//         }
-//         printf("ACCESSING PIPE NEXT\n");
-//         if (tmp->pipe_next)
-//             printf(" |pipe| ");
-//         else 
-//             printf(" |the end|");
-//         printf("TURN NEXT\n");
-//         tmp = tmp->pipe_next;
-//         printf("IT'S NEXT");
-//     } 
-//     printf("\n");
-// }
-
-// static void print_args(t_cmd *cmd) {
-//     t_cmd *tmp = cmd;
-//     while (tmp) {
-//         for (int i = 0; tmp->argv[i]; i++) {
-//             printf("%s ", tmp->argv[i]);
-//         }
-//         if (tmp->pipe_next) {
-//             printf(" |pipe| ");
-//             print_pipe_args(tmp->pipe_next);
-//         }
-//         else
-//             printf("\n");
-//         printf("ACCESSING NEXT COMMAND!\n");
-//         tmp = tmp->next;
-//         printf("ACCESSED!\n");
-//     }
-//     printf("THE END OF ARGS!\n");
-// }
 
 void parse_and_execute(t_shell *shell, char *input) {
     char **tokens = lexer_tokenize(input);
@@ -194,15 +157,15 @@ void parse_and_execute(t_shell *shell, char *input) {
 
     expand_variables(tokens, shell->env, shell->last_status);
     t_cmd *cmd = parse_tokens(tokens);
-    for (t_cmd *c = cmd; c; c = c->next) {
-        printf("CMD: %s\n", c->argv[0]);
-        for (t_cmd *p = c->pipe_next; p; p = p->pipe_next)
-            printf("  |> %s\n", p->argv[0]);
-    }
+    // for (t_cmd *c = cmd; c; c = c->next) {
+    //     printf("CMD: %s\n", c->argv[0]);
+    //     for (t_cmd *p = c->pipe_next; p; p = p->pipe_next)
+    //         printf("  |> %s\n", p->argv[0]);
+    // }
     free_tokens(tokens);
     // printf("CLEANED!!");
     if (!cmd) return;
 
-    // execute_cmd(shell, cmd);
+    execute_cmd(shell, cmd);
     free_cmd(cmd);
 }
