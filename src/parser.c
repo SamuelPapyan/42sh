@@ -33,62 +33,99 @@ static void add_redir(t_redir **lst, t_token_type type, const char *file) {
     }
 }
 
-t_cmd   *parse_tokens(char **tokens) {
-    t_cmd *head = NULL, *curr = NULL;
-    char **argv = NULL;
-    int argc = 0;
-    t_redir *redir = NULL;
+t_cmd	*parse_tokens(char **tokens)
+{
+	t_cmd *head = NULL, *curr = NULL;
+	t_cmd *pipe_head = NULL, *pipe_curr = NULL;
 
-    for (int i = 0; tokens[i]; i++) {
-        t_token_type type = get_op_type(tokens[i]);
-        
-        if (type == TOKEN_WORD) {
-            add_arg(&argv, &argc, tokens[i]);
-        }
-        else if (type == TOKEN_REDIR_OUT || type == TOKEN_REDIR_APPEND
-            || type== TOKEN_REDIR_IN || type == TOKEN_HEREDOC)
-        {
-            if (!tokens[i + 1]) break;
-            add_redir(&redir, type, tokens[++i]);
-        }
-        else {
-            t_cmd *new = malloc(sizeof(t_cmd));
-            new->argv = argv;
-            new->redirs = redir;
+	char **argv = NULL;
+	int argc = 0;
+	t_redir *redir = NULL;
+
+	for (int i = 0; tokens[i]; i++) {
+		t_token_type type = get_op_type(tokens[i]);
+
+		if (type == TOKEN_WORD) {
+			add_arg(&argv, &argc, tokens[i]);
+		}
+		else if (type == TOKEN_REDIR_OUT || type == TOKEN_REDIR_APPEND
+			|| type == TOKEN_REDIR_IN || type == TOKEN_HEREDOC)
+		{
+			if (!tokens[i + 1]) break;
+			add_redir(&redir, type, tokens[++i]);
+		}
+		else if (type == TOKEN_PIPE)
+		{
+			t_cmd *new = malloc(sizeof(t_cmd));
+			new->argv = argv;
+			new->redirs = redir;
+            new->next = NULL;
+            new->pipe_next = NULL;
+
+			if (!pipe_head)
+				pipe_head = new;
+			else
+				pipe_curr->pipe_next = new;
+
+			pipe_curr = new;
+
+			argv = NULL;
+			redir = NULL;
+			argc = 0;
+		}
+		else
+		{
+			// конец цепочки пайпов (если была)
+			t_cmd *new = malloc(sizeof(t_cmd));
+			new->argv = argv;
+			new->redirs = redir;
+			new->next_type = type;
             new->pipe_next = NULL;
             new->next = NULL;
-            new->next_type = type;
 
-            if (!head)
-                head = new;
-            else if (type == TOKEN_PIPE)
-                curr->pipe_next = new;
-            else
-                curr->next = new;
+			if (pipe_head) {
+				pipe_curr->pipe_next = new;
+				new = pipe_head;
+				pipe_head = pipe_curr = NULL;
+			}
 
-            curr = new;
-            argv = NULL;
-            redir = NULL;
-            argc = 0;
-        }
-    }
+			if (!head)
+				head = new;
+			else
+				curr->next = new;
 
-    if (argv) {
-        t_cmd *final = malloc(sizeof(t_cmd));
-        final->argv = argv;
-        final->redirs = redir;
-        final->pipe_next = NULL;
-        final->next = NULL;
-        final->next_type = 0;
-        if (!head)
-            head = final;
-        else
-            curr->next = final;
-    }
-    return head;
+			curr = new;
+			argv = NULL;
+			redir = NULL;
+			argc = 0;
+		}
+	}
+
+	// последняя команда (или финал пайпа)
+	if (argv || pipe_head)
+	{
+		t_cmd *new = malloc(sizeof(t_cmd));
+		new->argv = argv;
+		new->redirs = redir;
+        new->next = NULL;
+        new->pipe_next = NULL;
+
+		if (pipe_head) {
+			pipe_curr->pipe_next = new;
+			new = pipe_head;
+		}
+
+		if (!head)
+			head = new;
+		else
+			curr->next = new;
+	}
+
+	return head;
 }
 
 void free_cmd(t_cmd *cmd) {
+    // printf("FRREING COMMANDS\n");
     while (cmd) {
         t_cmd *next = cmd->next;
         for (int i = 0; cmd->argv && cmd->argv[i]; i++)
@@ -102,6 +139,8 @@ void free_cmd(t_cmd *cmd) {
             free(r);
             r = n;
         }
+        if (cmd->pipe_next)
+            free_cmd(cmd->pipe_next);
         free(cmd);
         cmd = next;
     }
@@ -111,23 +150,20 @@ void parse_and_execute(t_shell *shell, char *input) {
     char **tokens = lexer_tokenize(input);
     if (!tokens)
         return;
-    printf("Tokens:\n");
-    for (int i = 0; tokens[i]; i++)
-        printf("  [%s]\n", tokens[i]);
+    // printf("Tokens:\n");
+    // for (int i = 0; tokens[i]; i++) {
+    //     printf("  [%s]\n", tokens[i]);
+    // }
 
     expand_variables(tokens, shell->env, shell->last_status);
     t_cmd *cmd = parse_tokens(tokens);
-    // t_cmd *tmp = cmd;
-    // while (tmp) {
-    //     int i = 0, j = 0;
-    //     while (tmp->argv[i]){
-    //         printf("%s ", tmp->argv[i]);
-    //         i++;
-    //     }
-    //     printf("\n");
-    //     tmp = tmp->next;
+    // for (t_cmd *c = cmd; c; c = c->next) {
+    //     printf("CMD: %s\n", c->argv[0]);
+    //     for (t_cmd *p = c->pipe_next; p; p = p->pipe_next)
+    //         printf("  |> %s\n", p->argv[0]);
     // }
     free_tokens(tokens);
+    // printf("CLEANED!!");
     if (!cmd) return;
 
     execute_cmd(shell, cmd);

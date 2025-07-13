@@ -26,6 +26,17 @@ static void	apply_redirs(t_redir *r)
 	}
 }
 
+// static int count_of_pipe_cmds(t_cmd* cmd) {
+// 	t_cmd	*tmp = cmd;
+// 	int		c = 0;
+
+// 	while (tmp) {
+// 		c++;
+// 		cmd = cmd->pipe_next;
+// 	}
+// 	return c;
+// }
+
 // Выполнение пайпов: a | b | c
 void	run_pipeline(t_cmd *cmd, t_shell *shell)
 {
