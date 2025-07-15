@@ -16,6 +16,7 @@ typedef enum e_token_type {
 typedef struct s_redir {
     t_token_type    type;
     char            *file;
+    int             is_tempfile;
     struct s_redir  *next;
 } t_redir;
 

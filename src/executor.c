@@ -1,6 +1,5 @@
 #include "42sh.h"
 
-// Обработка редиректов (>, >>, <)
 static void	apply_redirs(t_redir *r)
 {
 	while (r)
@@ -12,32 +11,26 @@ static void	apply_redirs(t_redir *r)
 			fd = open(r->file, O_WRONLY | O_CREAT | O_APPEND, 0644);
 		else if (r->type == TOKEN_REDIR_IN)
 			fd = open(r->file, O_RDONLY);
+		else if (r->type == TOKEN_HEREDOC) {
+
+			fd = open(r->file, O_RDONLY);
+		}
 
 		if (fd == -1)
 		{
-			perror("open");
+			perror(r->file);
 		}
-		else if (r->type == TOKEN_REDIR_IN)
-			dup2(fd, STDIN_FILENO);
-		else
-			dup2(fd, STDOUT_FILENO);
-		close(fd);
+		else {
+			if (r->type == TOKEN_REDIR_IN || r->type == TOKEN_HEREDOC)
+				dup2(fd, STDIN_FILENO);
+			else
+				dup2(fd, STDOUT_FILENO);
+			close(fd);
+		}
 		r = r->next;
 	}
 }
 
-// static int count_of_pipe_cmds(t_cmd* cmd) {
-// 	t_cmd	*tmp = cmd;
-// 	int		c = 0;
-
-// 	while (tmp) {
-// 		c++;
-// 		cmd = cmd->pipe_next;
-// 	}
-// 	return c;
-// }
-
-// Выполнение пайпов: a | b | c
 void	run_pipeline(t_cmd *cmd, t_shell *shell)
 {
 	int		prev_fd = -1;
@@ -105,13 +98,14 @@ void	run_pipeline(t_cmd *cmd, t_shell *shell)
 	}
 }
 
-// Выполнение одиночной команды без пайпа
 static void	run_single(t_cmd *cmd, t_shell *shell)
 {
 	if (!cmd || !cmd->argv || !cmd->argv[0])
 		return;
 
-	if (is_builtin(cmd->argv[0]))
+	int has_redirs = (cmd->redirs != NULL);
+
+	if (is_builtin(cmd->argv[0]) && !has_redirs)
 	{
 		shell->last_status = exec_builtin(shell, cmd->argv);
 		return;
@@ -122,7 +116,8 @@ static void	run_single(t_cmd *cmd, t_shell *shell)
 	{
 		apply_redirs(cmd->redirs);
 
-		// char **envp = env_to_envp(shell->env);
+		if (is_builtin(cmd->argv[0]))
+			exit(exec_builtin(shell, cmd->argv));
 		execvp(cmd->argv[0], cmd->argv);
 		perror("exec");
 		exit(1);
@@ -135,7 +130,7 @@ static void	run_single(t_cmd *cmd, t_shell *shell)
 	}
 }
 
-// Главный обработчик команд
+
 void	execute_cmd(t_shell *shell, t_cmd *cmd)
 {
 	while (cmd)

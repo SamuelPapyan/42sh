@@ -23,6 +23,7 @@ static void add_redir(t_redir **lst, t_token_type type, const char *file) {
     r->type = type;
     r->file = strdup(file);
     r->next = NULL;
+    r->is_tempfile = 0;
 
     if (!*lst)
         *lst = r;
@@ -75,7 +76,6 @@ t_cmd	*parse_tokens(char **tokens)
 		}
 		else
 		{
-			// конец цепочки пайпов (если была)
 			t_cmd *new = malloc(sizeof(t_cmd));
 			new->argv = argv;
 			new->redirs = redir;
@@ -101,7 +101,6 @@ t_cmd	*parse_tokens(char **tokens)
 		}
 	}
 
-	// последняя команда (или финал пайпа)
 	if (argv || pipe_head)
 	{
 		t_cmd *new = malloc(sizeof(t_cmd));
@@ -125,7 +124,6 @@ t_cmd	*parse_tokens(char **tokens)
 }
 
 void free_cmd(t_cmd *cmd) {
-    // printf("FRREING COMMANDS\n");
     while (cmd) {
         t_cmd *next = cmd->next;
         for (int i = 0; cmd->argv && cmd->argv[i]; i++)
@@ -135,6 +133,8 @@ void free_cmd(t_cmd *cmd) {
         t_redir *r = cmd->redirs;
         while (r) {
             t_redir *n = r->next;
+            if (r->is_tempfile)
+                unlink(r->file);
             free(r->file);
             free(r);
             r = n;
@@ -150,22 +150,11 @@ void parse_and_execute(t_shell *shell, char *input) {
     char **tokens = lexer_tokenize(input);
     if (!tokens)
         return;
-    // printf("Tokens:\n");
-    // for (int i = 0; tokens[i]; i++) {
-    //     printf("  [%s]\n", tokens[i]);
-    // }
-
     expand_variables(tokens, shell->env, shell->last_status);
     t_cmd *cmd = parse_tokens(tokens);
-    // for (t_cmd *c = cmd; c; c = c->next) {
-    //     printf("CMD: %s\n", c->argv[0]);
-    //     for (t_cmd *p = c->pipe_next; p; p = p->pipe_next)
-    //         printf("  |> %s\n", p->argv[0]);
-    // }
     free_tokens(tokens);
-    // printf("CLEANED!!");
     if (!cmd) return;
-
+    process_heredocs(cmd);
     execute_cmd(shell, cmd);
     free_cmd(cmd);
 }
