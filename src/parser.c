@@ -9,6 +9,8 @@ static t_token_type get_op_type(const char *s) {
     if (!strcmp(s, ">>")) return TOKEN_REDIR_APPEND;
     if (!strcmp(s, "<")) return TOKEN_REDIR_IN;
     if (!strcmp(s, "<<")) return TOKEN_HEREDOC;
+    if (!strcmp(s, ">&")) return TOKEN_REDIR_AGGR_OUT;
+    if (!strcmp(s, "<&")) return TOKEN_REDIR_AGGR_IN;
     return TOKEN_WORD;
 }
 
@@ -45,6 +47,26 @@ t_cmd	*parse_tokens(char **tokens)
 
 	for (int i = 0; tokens[i]; i++) {
 		t_token_type type = get_op_type(tokens[i]);
+
+        if (isdigit(tokens[i][0]) && tokens[i][1] == '>' && tokens[i][2]) {
+            // int from_fd = tokens[i][0] - '0';
+            if (tokens[i][2] == '&') {
+                if (!tokens[i + 1]) break;
+                t_redir *r = malloc(sizeof(t_redir));
+                r->type = TOKEN_REDIR_AGGR_OUT;
+                r->file = strdup(tokens[i] + 3);
+                redir ? (r->next = redir) : 0;
+                redir = r;
+            }
+            else {
+                t_redir *r = malloc(sizeof(t_redir));
+                r->type = TOKEN_REDIR_OUT;
+                r->file = strdup(tokens[i] + 2);
+                redir ? (r->next = redir) : 0;
+                redir = r;
+            }
+            continue;
+        }
 
 		if (type == TOKEN_WORD) {
 			add_arg(&argv, &argc, tokens[i]);

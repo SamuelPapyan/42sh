@@ -5,15 +5,72 @@ static void	apply_redirs(t_redir *r)
 	while (r)
 	{
 		int fd = -1;
-		if (r->type == TOKEN_REDIR_OUT)
+		if (r->type == TOKEN_REDIR_OUT) {
 			fd = open(r->file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-		else if (r->type == TOKEN_REDIR_APPEND)
+			if (fd == -1) perror(r->file);
+			else {
+				dup2(fd, STDOUT_FILENO); 
+				close(fd);
+			}
+		}
+		else if (r->type == TOKEN_REDIR_APPEND) {
 			fd = open(r->file, O_WRONLY | O_CREAT | O_APPEND, 0644);
-		else if (r->type == TOKEN_REDIR_IN)
+			if (fd == -1) perror(r->file);
+			else {
+				dup2(fd, STDOUT_FILENO);
+				close(fd);
+			}
+		}
+		else if (r->type == TOKEN_REDIR_IN) {
 			fd = open(r->file, O_RDONLY);
+			if (fd == -1) perror(r->file);
+			else {
+				dup2(fd, STDIN_FILENO);
+				close(fd);
+			}
+		}
 		else if (r->type == TOKEN_HEREDOC) {
-
 			fd = open(r->file, O_RDONLY);
+			if (fd == -1) perror(r->file);
+			else {
+				dup2(fd, STDIN_FILENO);
+				close(fd);
+			}
+		}
+		else if (r->type == TOKEN_REDIR_AGGR_OUT)
+		{
+			if (isdigit(r->file[0]) && r->file[1] == '\0') {
+				int target_fd = atoi(r->file);
+				dup2(target_fd, STDIN_FILENO);
+				dup2(target_fd, STDERR_FILENO);
+			}
+			else if (strcmp(r->file, "-") == 0) {
+				close(STDOUT_FILENO);
+				close(STDERR_FILENO);
+			}
+			else {
+				fd = open(r->file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+				if (fd == -1) perror(r->file);
+				else {
+					dup2(fd, STDOUT_FILENO);
+					dup2(fd, STDERR_FILENO);
+					close(fd);
+				}
+			}
+		}
+		else if (r->type == TOKEN_REDIR_AGGR_IN)
+		{
+			// <& N — перенаправить stdin из другого fd
+			if (isdigit(r->file[0]) && r->file[1] == '\0') {
+				int source_fd = atoi(r->file);
+				dup2(source_fd, STDIN_FILENO);
+			}
+			else if (strcmp(r->file, "-") == 0) {
+				close(STDIN_FILENO);
+			}
+			else {
+				fprintf(stderr, "shell: invalid input redirection: %s\n", r->file);
+			}
 		}
 
 		if (fd == -1)

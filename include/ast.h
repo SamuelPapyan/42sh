@@ -10,7 +10,9 @@ typedef enum e_token_type {
     TOKEN_REDIR_OUT,
     TOKEN_REDIR_APPEND,
     TOKEN_REDIR_IN,
-    TOKEN_HEREDOC
+    TOKEN_HEREDOC,
+    TOKEN_REDIR_AGGR_OUT,
+    TOKEN_REDIR_AGGR_IN
 } t_token_type;
 
 typedef struct s_redir {
